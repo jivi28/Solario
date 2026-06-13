@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker, useMapContext } from "react-simple-maps"
@@ -143,8 +144,20 @@ function hexToRgba(hex: string, a: number) {
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`
 }
 
-// Placed-solar-farm accent (Solario orange) — distinct from the suitability palette.
+// Placed-solar-farm accent (Solaris orange) — distinct from the suitability palette.
 const FARM_COLOR = "#f97316"
+
+// Shared style for the top-bar action buttons: bigger, bold, and set in the
+// Space Grotesk display face so they read as primary controls.
+const TOPBTN: React.CSSProperties = {
+  padding: "8px 16px",
+  borderRadius: "8px",
+  fontSize: "13px",
+  fontWeight: 700,
+  letterSpacing: "0.01em",
+  fontFamily: "var(--font-display), system-ui, sans-serif",
+  cursor: "pointer",
+}
 
 // Mirrors config.VEG_RISK_NEAR_M: beyond this the nearest line is treated as too
 // far to be the interconnection, so its vegetation no longer affects the score.
@@ -943,38 +956,47 @@ export default function BavariaSuitabilityMap() {
         initial={{ y: -40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ duration: 0.7 }}
         style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 24px", borderBottom: "1px solid rgba(255,255,255,0.06)", background: "rgba(7,9,15,0.95)", backdropFilter: "blur(12px)", zIndex: 30, flexShrink: 0 }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <div style={{ width: "28px", height: "28px", borderRadius: "6px", background: "linear-gradient(135deg,#f97316,#eab308)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <span style={{ fontSize: "14px" }}>☀</span>
-          </div>
-          <span style={{ fontSize: "16px", fontWeight: 700, color: "white", letterSpacing: "-0.02em" }}>Solario</span>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Glowing yellow sun — a soft-rayed disc with a pulsing amber halo */}
+          <motion.div
+            aria-hidden
+            initial={{ opacity: 0.9 }}
+            animate={{ filter: ["brightness(1)", "brightness(1.15)", "brightness(1)"] }}
+            transition={{ duration: 4, ease: "easeInOut", repeat: Infinity }}
+            style={{
+              width: "30px", height: "30px", borderRadius: "50%",
+              background: "radial-gradient(circle at 50% 45%, #fff8e1 0%, #ffd54a 38%, #f7b733 70%, #f59e0b 100%)",
+              boxShadow: "0 0 10px 2px rgba(250,204,21,0.85), 0 0 22px 6px rgba(249,115,22,0.45), 0 0 40px 14px rgba(250,204,21,0.18)",
+            }}
+          />
+          <span style={{ fontSize: "19px", fontWeight: 700, color: "white", letterSpacing: "0.04em", fontFamily: "var(--font-display), system-ui, sans-serif" }}>SOLARIS</span>
           <span style={{ fontSize: "10px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", borderLeft: "1px solid rgba(255,255,255,0.1)", paddingLeft: "10px", letterSpacing: "0.15em", textTransform: "uppercase" }}>
             Bavaria · Ground-mounted PV
           </span>
         </div>
 
-        <div style={{ display: "flex", gap: "8px" }}>
+        <div style={{ display: "flex", gap: "10px" }}>
           <button
             onClick={() => setShowTop5((v) => !v)}
-            style={{ padding: "5px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer", background: showTop5 ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.05)", color: showTop5 ? "#f97316" : "rgba(255,255,255,0.5)" }}
+            style={{ ...TOPBTN, border: "1px solid rgba(255,255,255,0.1)", background: showTop5 ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.05)", color: showTop5 ? "#f97316" : "rgba(255,255,255,0.6)" }}
           >
             ★ Top 5 sites
           </button>
           <button
             onClick={() => { setPlacing((v) => !v); setPendingCell(null) }}
-            style={{ padding: "5px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, border: `1px solid ${placing ? "rgba(249,115,22,0.6)" : "rgba(255,255,255,0.1)"}`, cursor: "pointer", background: placing ? "rgba(249,115,22,0.25)" : "rgba(255,255,255,0.05)", color: placing ? "#f97316" : "rgba(255,255,255,0.5)" }}
+            style={{ ...TOPBTN, border: `1px solid ${placing ? "rgba(249,115,22,0.6)" : "rgba(255,255,255,0.1)"}`, background: placing ? "rgba(249,115,22,0.25)" : "rgba(255,255,255,0.05)", color: placing ? "#f97316" : "rgba(255,255,255,0.6)" }}
           >
             {placing ? "Placing… click a cell" : "＋ Place farm"}
           </button>
           <button
             onClick={() => setShowSatellite((v) => !v)}
-            style={{ padding: "5px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer", background: showSatellite ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.05)", color: showSatellite ? "#f97316" : "rgba(255,255,255,0.5)" }}
+            style={{ ...TOPBTN, border: "1px solid rgba(255,255,255,0.1)", background: showSatellite ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.05)", color: showSatellite ? "#f97316" : "rgba(255,255,255,0.6)" }}
           >
             {showSatellite ? "Satellite on" : "Satellite off"}
           </button>
           <button
             onClick={() => setHideExcluded((v) => !v)}
-            style={{ padding: "5px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: 600, border: "1px solid rgba(255,255,255,0.1)", cursor: "pointer", background: hideExcluded ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.05)", color: hideExcluded ? "#f97316" : "rgba(255,255,255,0.5)" }}
+            style={{ ...TOPBTN, border: "1px solid rgba(255,255,255,0.1)", background: hideExcluded ? "rgba(249,115,22,0.2)" : "rgba(255,255,255,0.05)", color: hideExcluded ? "#f97316" : "rgba(255,255,255,0.6)" }}
           >
             {hideExcluded ? "Showing buildable only" : "Hide excluded cells"}
           </button>
@@ -987,8 +1009,8 @@ export default function BavariaSuitabilityMap() {
             { label: "Satisfactory", value: counts ? String(counts.okay) : "—" },
             { label: "Source", value: "NASA + Copernicus" },
           ].map((s) => (
-            <div key={s.label} style={{ textAlign: "right" }}>
-              <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.3)", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</div>
+            <div key={s.label} style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "10px", color: "#ffd54a", fontFamily: "monospace", textTransform: "uppercase", letterSpacing: "0.08em" }}>{s.label}</div>
               <div style={{ fontSize: "13px", fontWeight: 700, color: "white" }}>{s.value}</div>
             </div>
           ))}
@@ -997,11 +1019,24 @@ export default function BavariaSuitabilityMap() {
 
       {/* Map */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden", cursor: placing ? "crosshair" : undefined }}>
+        {/* Ambient backlight — a soft white radial glow sitting behind the map so
+            Bavaria reads as lit from behind rather than floating on flat black.
+            Decorative only: never intercepts pointer events and sits beneath the
+            map SVG (which has a transparent background, so the glow shows through). */}
+        <div
+          aria-hidden
+          style={{
+            position: "absolute", top: "48%", left: "50%", transform: "translate(-50%, -50%)",
+            width: "62%", height: "82%", borderRadius: "50%",
+            background: "radial-gradient(ellipse at center, rgba(255,255,255,0.11) 0%, rgba(255,255,255,0.045) 38%, rgba(255,255,255,0) 70%)",
+            filter: "blur(26px)", pointerEvents: "none", zIndex: 0,
+          }}
+        />
         {data && (
           <ComposableMap
             projection="geoMercator"
             projectionConfig={{ center: CENTER, scale: 4800 }}
-            style={{ width: "100%", height: "100%" }}
+            style={{ width: "100%", height: "100%", position: "relative", zIndex: 1 }}
           >
             <ZoomableGroup
               center={view.coordinates}
@@ -1221,7 +1256,7 @@ export default function BavariaSuitabilityMap() {
                 position: "absolute", top: "20px", left: "50%",
                 background: "rgba(7,9,15,0.95)", border: "1px solid rgba(255,255,255,0.1)",
                 borderRadius: "8px", padding: "8px 16px", display: "flex", alignItems: "center", gap: "12px",
-                backdropFilter: "blur(8px)", pointerEvents: "none", maxWidth: "80%",
+                backdropFilter: "blur(8px)", pointerEvents: "none", maxWidth: "80%", zIndex: 20,
               }}
             >
               <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: CLASS_COLOR[hovered.suitability_class], boxShadow: `0 0 8px ${CLASS_COLOR[hovered.suitability_class]}` }} />
@@ -1263,10 +1298,53 @@ export default function BavariaSuitabilityMap() {
           </button>
         </div>
 
+        {/* Your solar farms — placed-farm roster, stacked above the legend.
+            Each row opens that farm's dashboard (FarmPanel). Only shown once at
+            least one farm exists, mirroring the count badge in the header. */}
+        <AnimatePresence>
+          {farms.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} transition={{ delay: 0.55 }}
+              style={{ position: "absolute", bottom: "188px", left: "20px", width: "240px", background: "rgba(7,9,15,0.9)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "16px", padding: "14px 16px", backdropFilter: "blur(10px)", zIndex: 20 }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "12px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+                  <span style={{ width: "10px", height: "10px", borderRadius: "50%", background: "#eab308", boxShadow: "0 0 8px rgba(234,179,8,0.9)" }} />
+                  <span style={{ fontSize: "13px", fontWeight: 700, color: "white" }}>Your solar farms</span>
+                </div>
+                <span style={{ fontSize: "11px", fontFamily: "monospace", color: "rgba(255,255,255,0.4)" }}>{farms.length}</span>
+              </div>
+              {farms.map((farm) => {
+                const cap = capacityKwp(farm.area_m2)
+                const capLabel = cap >= 1000 ? `${(cap / 1000).toFixed(1)} MWp` : `${cap.toFixed(0)} kWp`
+                const active = selectedFarm?.id === farm.id
+                return (
+                  <button
+                    key={farm.id}
+                    onClick={() => { setSelected(null); setSelectedFarm(farm) }}
+                    style={{ display: "flex", alignItems: "center", gap: "11px", width: "100%", textAlign: "left", padding: "9px 10px", marginBottom: "6px", borderRadius: "11px", cursor: "pointer", background: active ? "rgba(249,115,22,0.14)" : "rgba(255,255,255,0.035)", border: `1px solid ${active ? "rgba(249,115,22,0.4)" : "rgba(255,255,255,0.06)"}` }}
+                    onMouseEnter={(ev) => { if (!active) ev.currentTarget.style.background = "rgba(255,255,255,0.07)" }}
+                    onMouseLeave={(ev) => { if (!active) ev.currentTarget.style.background = "rgba(255,255,255,0.035)" }}
+                  >
+                    <span style={{ width: "22px", height: "22px", borderRadius: "6px", background: "linear-gradient(135deg,#f97316,#eab308)", flexShrink: 0, boxShadow: "0 0 10px rgba(249,115,22,0.4)" }} />
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: "block", fontSize: "14px", fontWeight: 700, color: "white", lineHeight: 1.2 }}>{capLabel}</span>
+                      <span style={{ display: "block", fontSize: "10px", color: "rgba(255,255,255,0.4)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginTop: "2px" }}>
+                        {formatArea(farm.area_m2)} · {formatCoords(farm.lat, farm.lon)}
+                      </span>
+                    </span>
+                    <span style={{ color: FARM_COLOR, fontSize: "15px", flexShrink: 0 }}>→</span>
+                  </button>
+                )
+              })}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Legend */}
         <motion.div
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}
-          style={{ position: "absolute", bottom: "20px", left: "20px", background: "rgba(7,9,15,0.9)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "12px 16px", backdropFilter: "blur(8px)" }}
+          style={{ position: "absolute", bottom: "20px", left: "20px", background: "rgba(7,9,15,0.9)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: "10px", padding: "12px 16px", backdropFilter: "blur(8px)", zIndex: 20 }}
         >
           <div style={{ fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.15em", marginBottom: "8px" }}>
             Suitability class
@@ -1286,14 +1364,14 @@ export default function BavariaSuitabilityMap() {
         {!selected && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}
-            style={{ position: "absolute", bottom: "24px", right: "70px", fontSize: "11px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", letterSpacing: "0.05em", textAlign: "right" }}
+            style={{ position: "absolute", bottom: "24px", right: "70px", fontSize: "11px", fontFamily: "monospace", color: "rgba(255,255,255,0.3)", letterSpacing: "0.05em", textAlign: "right", zIndex: 20 }}
           >
             scroll to zoom · drag to pan · click a cell →
           </motion.div>
         )}
 
         {/* Data source tags */}
-        <div style={{ position: "absolute", top: "20px", right: selected || selectedFarm ? "340px" : "20px", transition: "right 0.3s", display: "flex", gap: "8px" }}>
+        <div style={{ position: "absolute", top: "20px", right: selected || selectedFarm ? "340px" : "20px", transition: "right 0.3s", display: "flex", gap: "8px", zIndex: 20 }}>
           {["NASA POWER", "Copernicus", "MaStR"].map((s) => (
             <span key={s} style={{ fontSize: "9px", fontFamily: "monospace", color: "rgba(255,255,255,0.2)", border: "1px solid rgba(255,255,255,0.08)", padding: "2px 6px", borderRadius: "3px" }}>{s}</span>
           ))}

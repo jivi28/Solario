@@ -1,5 +1,5 @@
-import BavariaSuitabilityMap from "@/components/BavariaSuitabilityMap"
+import WelcomeGate from "@/components/WelcomeGate"
 
 export default function Page() {
-  return <BavariaSuitabilityMap />
+  return <WelcomeGate />
 }
