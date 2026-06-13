@@ -14,3 +14,15 @@ _book
 *.epub
 *.mobi
 *.pdf
+
+# --- Python / ML (aiclassification branch) ---
+.venv/
+__pycache__/
+*.pyc
+.env
+pipeline.log
+
+# Regenerable data (kept: data/raw inputs + outputs/ + models/)
+data/interim/
+data/raw/solar_farms.geojson
+data/raw/labels.geojson

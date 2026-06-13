@@ -1,0 +1,117 @@
+"""Central configuration for the solar-farm land-suitability classifier.
+
+Everything tunable lives here so the pipeline scripts stay declarative.
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# --- Paths -----------------------------------------------------------------
+ROOT = Path(__file__).resolve().parent.parent
+DATA = ROOT / "data"
+RAW = DATA / "raw"
+INTERIM = DATA / "interim"
+PROCESSED = DATA / "processed"
+MODELS = ROOT / "models"
+OUTPUTS = ROOT / "outputs"
+for _d in (RAW, INTERIM, PROCESSED, MODELS, OUTPUTS):
+    _d.mkdir(parents=True, exist_ok=True)
+
+# --- Google Earth Engine ---------------------------------------------------
+GEE_PROJECT = os.getenv("GEE_PROJECT", "").strip()
+
+# AlphaEarth Foundations annual satellite embeddings (64 bands, 10 m).
+EMBEDDING_COLLECTION = "GOOGLE/SATELLITE_EMBEDDING/V1/ANNUAL"
+EMBEDDING_YEAR = 2024          # latest annual layer; falls back in gee_data if missing
+EMBEDDING_BANDS = [f"A{i:02d}" for i in range(64)]  # A00..A63
+
+# Tier-2 feature datasets (all in-GEE).
+WORLDCOVER = "ESA/WorldCover/v200"          # 10 m land cover (one image collection)
+SRTM = "USGS/SRTMGL1_003"                    # elevation -> slope
+ERA5_MONTHLY = "ECMWF/ERA5_LAND/MONTHLY_AGGR"  # surface_solar_radiation_downwards_sum
+WDPA = "WCMC/WDPA/current/polygons"            # World Database on Protected Areas
+
+# Local power-line file (auto-fetched from OSM if absent; drop in an official
+# powerlines_bavaria.geojson to override). Powers the `factor_grid` factor.
+F_POWERLINES = RAW / "powerlines_bavaria.geojson"
+
+# WorldCover class codes we treat as *non-buildable* for solar (exclusion mask).
+# 10 tree, 50 built-up, 80 perm. water, 90 herbaceous wetland, 95 mangrove.
+WORLDCOVER_EXCLUDE = [10, 50, 80, 90, 95]
+
+# Human-readable names for every ESA WorldCover v200 class (for reasons/tooltip).
+WORLDCOVER_NAMES = {
+    10: "forest / tree cover", 20: "shrubland", 30: "grassland",
+    40: "cropland", 50: "built-up area", 60: "bare / sparse vegetation",
+    70: "snow & ice", 80: "open water", 90: "herbaceous wetland",
+    95: "mangrove", 100: "moss & lichen",
+}
+# How good each (non-excluded) land cover is to actually build a solar farm on,
+# 0..1. Feeds the `land use` factor score and its reason text.
+WORLDCOVER_SUITABILITY = {
+    30: 1.00,   # grassland - ideal
+    60: 0.95,   # bare / sparse - ideal
+    40: 0.85,   # cropland - common, some land-use conflict
+    20: 0.70,   # shrubland - workable
+    100: 0.40,  # moss & lichen - marginal
+    70: 0.10,   # snow & ice - poor
+}
+
+# --- Region: Bavaria -------------------------------------------------------
+# FAO GAUL admin-1 name for the boundary lookup.
+GAUL_L1 = "FAO/GAUL/2015/level1"
+BAVARIA_ADM1_NAME = "Bayern"
+# Rough bbox fallback (minlon, minlat, maxlon, maxlat) if GAUL is unavailable.
+BAVARIA_BBOX = (8.9, 47.2, 13.9, 50.6)
+
+# --- Grid ------------------------------------------------------------------
+GRID_CELL_KM = 5.0            # CheckList Step 1: 5 km x 5 km candidate cells
+
+# --- Labels ----------------------------------------------------------------
+# Tried in order; first one that answers wins. Mirrors differ in load/policy,
+# so a 406/429/5xx on one is routine -> fall through to the next.
+OVERPASS_ENDPOINTS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter",
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+]
+OVERPASS_URL = OVERPASS_ENDPOINTS[0]   # back-compat alias
+OVERPASS_UA = "solar-suitability-hackathon/1.0 (Overpass label fetch)"
+# OSM returns ~27k solar features for Bavaria (mostly rooftop PV). Cap the
+# positives used for training so GEE sampling stays tractable; the full
+# download is still cached to F_SOLAR. Set to None to use all of them.
+MAX_POSITIVES = 2000
+NEG_PER_POS = 3               # background points per positive
+POS_BUFFER_M = 2000           # keep negatives at least this far from any solar farm
+RANDOM_SEED = 42
+
+# --- Model -----------------------------------------------------------------
+RF_PARAMS = dict(
+    n_estimators=400,
+    max_depth=None,
+    min_samples_leaf=2,
+    class_weight="balanced",
+    n_jobs=-1,
+    random_state=RANDOM_SEED,
+)
+SPATIAL_SPLIT_KM = 25.0       # block size for spatial train/test split
+
+# --- Output ----------------------------------------------------------------
+# Suitability score thresholds -> classes (probability of "suitable").
+CLASS_THRESHOLDS = {"good": 0.60, "okay": 0.35}  # else "bad"; excluded -> "excluded"
+
+# Named files
+F_BAVARIA = RAW / "bavaria.geojson"
+F_SOLAR = RAW / "solar_farms.geojson"
+F_LABELS = RAW / "labels.geojson"
+F_GRID = INTERIM / "bavaria_grid.geojson"
+F_LABEL_FEATURES = INTERIM / "label_features.csv"
+F_GRID_FEATURES = INTERIM / "grid_features.csv"
+F_MODEL = MODELS / "suitability_rf.pkl"
+F_OUTPUT = OUTPUTS / "bavaria_suitability.geojson"
