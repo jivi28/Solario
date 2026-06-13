@@ -92,7 +92,9 @@ def add_powerline_distance(df: pd.DataFrame, gdf: gpd.GeoDataFrame) -> pd.DataFr
     ).to_crs("EPSG:3035")
     joined = gpd.sjoin_nearest(pts, lines[["geometry"]], distance_col="dist_powerline_m")
     joined = joined[~joined.index.duplicated(keep="first")]
-    df["dist_powerline_m"] = joined["dist_powerline_m"].values
+    # Index-aligned (pts shares df's index): a positional .values copy would
+    # silently misalign / raise if sjoin_nearest dropped or reordered rows.
+    df["dist_powerline_m"] = joined["dist_powerline_m"]
     return df
 
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { ComposableMap, Geographies, Geography } from "react-simple-maps"
 
@@ -20,12 +20,13 @@ interface CellProps {
   cell_id: number
   lon: number
   lat: number
-  score: number
+  // Nullable: cells excluded for "missing data" carry nulls in the GeoJSON.
+  score: number | null
   suitability_class: SuitabilityClass
-  slope: number
-  ghi: number
-  dist_powerline_m: number
-  landcover: number
+  slope: number | null
+  ghi: number | null
+  dist_powerline_m: number | null
+  landcover: number | null
   protected: number
   factor_sun: number
   factor_terrain: number
@@ -91,10 +92,11 @@ function FactorBar({ label, value }: { label: string; value: number }) {
 // ─── Detail panel for a selected cell ───────────────────────────────────
 function CellPanel({ cell, onClose }: { cell: CellProps; onClose: () => void }) {
   const color = CLASS_COLOR[cell.suitability_class]
+  // score is a 0..1 probability; "missing data" cells carry nulls.
   const stats = [
-    { label: "Score", value: cell.score.toFixed(0) },
-    { label: "Slope", value: `${cell.slope.toFixed(1)}°` },
-    { label: "Grid dist.", value: `${(cell.dist_powerline_m / 1000).toFixed(1)} km` },
+    { label: "Score", value: cell.score != null ? cell.score.toFixed(2) : "n/a" },
+    { label: "Slope", value: cell.slope != null ? `${cell.slope.toFixed(1)}°` : "n/a" },
+    { label: "Grid dist.", value: cell.dist_powerline_m != null ? `${(cell.dist_powerline_m / 1000).toFixed(1)} km` : "n/a" },
     { label: "Protected", value: cell.protected ? "Yes" : "No" },
   ]
   return (
@@ -121,7 +123,7 @@ function CellPanel({ cell, onClose }: { cell: CellProps; onClose: () => void }) 
           background: hexToRgba(color, 0.13), border: `1px solid ${hexToRgba(color, 0.4)}`,
           color, fontSize: "11px", fontWeight: 700, padding: "3px 9px", borderRadius: "5px", fontFamily: "monospace",
         }}>
-          {CLASS_LABEL[cell.suitability_class].toUpperCase()} · SCORE {cell.score.toFixed(0)}
+          {CLASS_LABEL[cell.suitability_class].toUpperCase()} · SCORE {cell.score != null ? cell.score.toFixed(2) : "—"}
         </span>
         <p style={{ fontSize: "12px", color: "rgba(255,255,255,0.6)", marginTop: "12px", lineHeight: 1.5 }}>
           {cell.tooltip}
@@ -168,10 +170,42 @@ function CellPanel({ cell, onClose }: { cell: CellProps; onClose: () => void }) 
 }
 
 // ─── Main component ────────────────────────────────────────────────
+interface SuitabilityGeojson {
+  features: { properties: CellProps }[]
+}
+
 export default function BavariaSuitabilityMap() {
   const [selected, setSelected] = useState<CellProps | null>(null)
   const [hovered, setHovered] = useState<CellProps | null>(null)
   const [hideExcluded, setHideExcluded] = useState(false)
+  const [data, setData] = useState<SuitabilityGeojson | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  // Fetch the geojson ourselves (instead of letting <Geographies> do it) so we
+  // can compute the header counts from the live data and surface fetch errors
+  // instead of silently rendering a blank map.
+  useEffect(() => {
+    let cancelled = false
+    fetch(GEOJSON_URL)
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
+      .then((gj) => { if (!cancelled) setData(gj) })
+      .catch((e) => { if (!cancelled) setLoadError(e instanceof Error ? e.message : String(e)) })
+    return () => { cancelled = true }
+  }, [])
+
+  const counts = useMemo(() => {
+    if (!data?.features) return null
+    let good = 0, okay = 0
+    for (const f of data.features) {
+      const cls = f.properties?.suitability_class
+      if (cls === "good") good++
+      else if (cls === "okay") okay++
+    }
+    return { total: data.features.length, good, okay }
+  }, [data])
 
   // Static fill cache so hover/select re-renders stay cheap across 3k cells
   const styleFor = useMemo(
@@ -234,9 +268,9 @@ export default function BavariaSuitabilityMap() {
 
         <div style={{ display: "flex", gap: "20px" }}>
           {[
-            { label: "Cells", value: "3,061" },
-            { label: "Good", value: "27" },
-            { label: "Okay", value: "59" },
+            { label: "Cells", value: counts ? counts.total.toLocaleString("en-US") : "—" },
+            { label: "Good", value: counts ? String(counts.good) : "—" },
+            { label: "Okay", value: counts ? String(counts.okay) : "—" },
             { label: "Source", value: "NASA + Copernicus" },
           ].map((s) => (
             <div key={s.label} style={{ textAlign: "right" }}>
@@ -249,39 +283,63 @@ export default function BavariaSuitabilityMap() {
 
       {/* Map */}
       <div style={{ flex: 1, position: "relative", overflow: "hidden" }}>
-        <ComposableMap
-          projection="geoMercator"
-          projectionConfig={{ center: [11.4, 48.95], scale: 8200 }}
-          style={{ width: "100%", height: "100%" }}
-        >
-          <Geographies geography={GEOJSON_URL}>
-            {({ geographies }) =>
-              geographies.map((geo) => {
-                const p = geo.properties as CellProps
-                const cls = p.suitability_class
-                const dim = hideExcluded && cls === "excluded"
-                return (
-                  <Geography
-                    key={geo.rsmKey}
-                    geography={geo}
-                    onMouseEnter={() => !dim && setHovered(p)}
-                    onMouseLeave={() => setHovered(null)}
-                    onClick={() => !dim && setSelected(p)}
-                    style={styleFor(cls, dim)}
-                  />
-                )
-              })
-            }
-          </Geographies>
-        </ComposableMap>
+        {data && (
+          <ComposableMap
+            projection="geoMercator"
+            projectionConfig={{ center: [11.4, 48.95], scale: 8200 }}
+            style={{ width: "100%", height: "100%" }}
+          >
+            <Geographies geography={data}>
+              {({ geographies }) =>
+                geographies.map((geo) => {
+                  const p = geo.properties as CellProps
+                  const cls = p.suitability_class
+                  const dim = hideExcluded && cls === "excluded"
+                  return (
+                    <Geography
+                      key={geo.rsmKey}
+                      geography={geo}
+                      onMouseEnter={() => !dim && setHovered(p)}
+                      onMouseLeave={() => setHovered(null)}
+                      onClick={() => !dim && setSelected(p)}
+                      style={styleFor(cls, dim)}
+                    />
+                  )
+                })
+              }
+            </Geographies>
+          </ComposableMap>
+        )}
+
+        {/* Loading / fetch-error states (otherwise a failed fetch = silent blank map) */}
+        {!data && (
+          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {loadError ? (
+              <div style={{ textAlign: "center", maxWidth: "420px", padding: "0 20px" }}>
+                <div style={{ fontSize: "13px", color: "#ef4444", marginBottom: "6px", fontWeight: 600 }}>
+                  Failed to load suitability data
+                </div>
+                <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
+                  {loadError} · {GEOJSON_URL}
+                </div>
+              </div>
+            ) : (
+              <div style={{ fontSize: "12px", fontFamily: "monospace", color: "rgba(255,255,255,0.35)", letterSpacing: "0.1em" }}>
+                LOADING GRID…
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Hover tooltip */}
         <AnimatePresence>
           {hovered && (
             <motion.div
-              initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 8 }}
+              // x:"-50%" lives in the motion values: framer-motion owns `transform`,
+              // so a static translateX(-50%) in `style` would be overwritten.
+              initial={{ opacity: 0, y: 8, x: "-50%" }} animate={{ opacity: 1, y: 0, x: "-50%" }} exit={{ opacity: 0, y: 8, x: "-50%" }}
               style={{
-                position: "absolute", top: "20px", left: "50%", transform: "translateX(-50%)",
+                position: "absolute", top: "20px", left: "50%",
                 background: "rgba(7,9,15,0.95)", border: "1px solid rgba(255,255,255,0.1)",
                 borderRadius: "8px", padding: "8px 16px", display: "flex", alignItems: "center", gap: "12px",
                 backdropFilter: "blur(8px)", pointerEvents: "none", maxWidth: "80%",
